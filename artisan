@@ -1,0 +1,40 @@
+#!/usr/bin/env php
+<?php
+
+use Illuminate\Foundation\Application;
+use Symfony\Component\Console\Input\ArgvInput;
+
+// Automatically load PDO extensions if php.ini has them commented out in Laragon
+if ((! extension_loaded('pdo_mysql') || ! extension_loaded('pdo_sqlite')) && getenv('VISITOR_PDO_BOOTSTRAPPED') !== '1') {
+    $extDir = dirname(PHP_BINARY).DIRECTORY_SEPARATOR.'ext';
+    if (is_dir($extDir)) {
+        $cmd = [PHP_BINARY, '-d', 'extension_dir='.$extDir];
+        foreach (['pdo_mysql', 'mysqli', 'pdo_sqlite', 'sqlite3'] as $ext) {
+            if (file_exists($extDir.DIRECTORY_SEPARATOR.'php_'.$ext.'.dll')) {
+                $cmd[] = '-d';
+                $cmd[] = 'extension='.$ext;
+            }
+        }
+        foreach ($argv ?? [] as $arg) {
+            $cmd[] = $arg;
+        }
+        $env = array_merge(getenv(), ['VISITOR_PDO_BOOTSTRAPPED' => '1']);
+        $proc = proc_open($cmd, [STDIN, STDOUT, STDERR], $pipes, __DIR__, $env);
+        if (is_resource($proc)) {
+            exit(proc_close($proc));
+        }
+    }
+}
+
+define('LARAVEL_START', microtime(true));
+
+// Register the Composer autoloader...
+require __DIR__.'/vendor/autoload.php';
+
+// Bootstrap Laravel and handle the command...
+/** @var Application $app */
+$app = require_once __DIR__.'/bootstrap/app.php';
+
+$status = $app->handleCommand(new ArgvInput);
+
+exit($status);
